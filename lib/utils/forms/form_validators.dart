@@ -1,10 +1,5 @@
-import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-
+import 'package:gisila/gisila.dart';
 import 'package:my_app/utils/forms/field_exceptions.dart';
-import 'package:my_app/utils/forms/parsers/form_data.dart';
-import 'package:shelf/shelf.dart';
 
 /// Describes a single expected field in a form or JSON body.
 class FieldValidator<T> {
@@ -52,7 +47,8 @@ final passwordValidator = FieldValidator<String>(
 // Main form() helper
 // ---------------------------------------------------------------------------
 
-/// Parses and validates a JSON or form-data request body.
+/// Parses and validates a JSON, `application/x-www-form-urlencoded`, or
+/// `multipart/form-data` request body using gisila's [readBody].
 ///
 /// Returns a [Map] of validated values keyed by field name.
 /// Throws [FieldValidationException] if any required field is missing or any
@@ -61,30 +57,22 @@ Future<Map<String, dynamic>> form(
   Request request, {
   required List<FieldValidator<dynamic>> fields,
 }) async {
-  final contentType =
-      request.headers[HttpHeaders.contentTypeHeader]?.split(';').first.trim();
+  final hasRequired = fields.any((f) => f.isRequired);
+  final body = await readBody(request, required: hasRequired);
 
-  if (contentType == ContentType.json.value) {
-    return _parseAndValidate(
-      jsonDecode(await request.readAsString()) as Map<String, dynamic>,
-      fields,
-    );
+  final Map<String, dynamic> raw;
+  if (body is FormData) {
+    raw = {...body.fields, ...body.files};
+  } else if (body is Map<String, dynamic>) {
+    raw = body;
+  } else {
+    return {};
   }
 
-  if (contentType == 'multipart/form-data' ||
-      contentType == 'application/x-www-form-urlencoded') {
-    final fd = await parseFormData(
-      headers: request.headers,
-      body: request.readAsString,
-      bytes: request.read,
-    );
-    return _parseAndValidate({...fd.fields, ...fd.files}, fields);
-  }
-
-  return {};
+  return _validate(raw, fields);
 }
 
-Map<String, dynamic> _parseAndValidate(
+Map<String, dynamic> _validate(
   Map<String, dynamic> raw,
   List<FieldValidator<dynamic>> fields,
 ) {
