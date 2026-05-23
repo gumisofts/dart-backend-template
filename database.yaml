@@ -1,0 +1,19 @@
+# Gisila Database Configuration
+# Edit host/port/database/username/password to match your PostgreSQL instance.
+# For local Docker development use port 5454 (docker-compose maps 5454→5432).
+
+default: default
+
+connections:
+  default:
+    type: postgresql
+    host: localhost
+    port: 5454
+    database: my_app
+    username: postgres
+    password: postgres
+    ssl: false
+    connection_timeout: 30
+    query_timeout: 30
+    max_connections: 10
+    min_connections: 2

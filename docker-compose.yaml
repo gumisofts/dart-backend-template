@@ -1,0 +1,17 @@
+version: "3.8"
+services:
+  pg:
+    image: postgres:alpine
+    restart: always
+    ports:
+      - 5454:5432
+    environment:
+      POSTGRES_DB: my_app
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    shm_size: 256m
+
+volumes:
+  pg_data:

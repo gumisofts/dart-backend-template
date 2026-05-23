@@ -1,0 +1,38 @@
+User:
+  columns:
+    first_name:
+      type: varchar
+      is_null: true
+      allow_blank: true
+    last_name:
+      type: varchar
+      is_null: true
+      allow_blank: true
+    email:
+      type: varchar
+      is_null: true
+      is_unique: true
+      is_index: true
+    phone_number:
+      type: varchar
+      is_null: true
+      is_unique: true
+      is_index: true
+    password:
+      type: varchar
+      is_null: true
+    otp:
+      type: varchar
+      is_null: true
+    is_active:
+      type: boolean
+      is_null: false
+    is_staff:
+      type: boolean
+      is_null: false
+    created_at:
+      type: timestamp
+      is_null: false
+    updated_at:
+      type: timestamp
+      is_null: true
