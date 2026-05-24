@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:gisila/gisila.dart' show jsonResponse;
+import 'package:gisila/gisila.dart' show FieldValidationException, jsonResponse;
 import 'package:my_app/config.dart';
 import 'package:my_app/utils/exceptions.dart';
-import 'package:my_app/utils/forms/field_exceptions.dart';
 import 'package:postgres/postgres.dart';
 import 'package:shelf/shelf.dart';
 
