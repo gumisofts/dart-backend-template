@@ -10,12 +10,15 @@ A production-ready Dart backend template built on the **Gisila** stack:
 | `gisila_studio` | Django-style admin panel from ORM table metadata |
 
 Out of the box you get:
-- JWT authentication (register, login, `/auth/me`)
-- Users CRUD endpoints
-- OpenAPI docs at `/docs` (Swagger UI) and `/redoc`
-- Admin panel at `/studio`
-- Form validation helpers and typed error handling
-- Docker Compose for local PostgreSQL
+- **MVC layout** — thin controllers, typed `Form` inputs, request-scoped `Service` classes.
+- JWT-backed `Authenticator` that hydrates the active `User` into `ctx.principal!.claims['user']`.
+- Per-request PostgreSQL pool exposed through `ctx.db<Database>()`.
+- Centralised error mapping: `Conflict`, `BadRequest`, `NotFound` propagate cleanly; `PostgresException`s become JSON.
+- Per-route configuration (rate limit, timeout, content types, auth) via `RouteConfig`.
+- Users CRUD + auth (register, login, `/auth/me`, change password).
+- OpenAPI docs at `/docs` (Swagger UI) and `/redoc`.
+- Admin panel at `/studio`.
+- Docker Compose for local PostgreSQL.
 
 ---
 
@@ -86,28 +89,28 @@ dart-backend-template/
 ├── bin/
 │   └── server.dart                 # Entry point; hot-reload + multi-isolate
 ├── lib/
-│   ├── my_app.dart                 # GisilaApp wiring (middleware, routes, docs)
+│   ├── my_app.dart                 # GisilaApp wiring (config, services, controllers)
 │   ├── admin.dart                  # GisilaStudio model registrations
 │   ├── config.dart                 # env, logger, databaseConfig, init()
-│   ├── endpoints/
-│   │   ├── auth.dart               # POST /auth/register|login, GET /auth/me
-│   │   └── users.dart              # GET/PATCH/DELETE /users/...
-│   ├── middlewares/
-│   │   └── authentication.dart     # JWT → request.contextUser
+│   ├── endpoints/                  # Thin controllers
+│   │   ├── auth.dart
+│   │   └── users.dart
+│   ├── forms/                      # Typed request body schemas (Form subclasses)
+│   │   ├── auth_forms.dart
+│   │   └── user_forms.dart
+│   ├── services/                   # Business logic (Service subclasses)
+│   │   ├── auth_service.dart
+│   │   └── users_service.dart
+│   ├── infra/                      # Framework integrations
+│   │   ├── database_provider.dart  # GisilaOrmDatabaseProvider
+│   │   ├── jwt_authenticator.dart  # JWT-backed Authenticator
+│   │   └── postgres_error_mapper.dart  # 23xxx → 400/409 JSON
 │   ├── models/
 │   │   ├── schema.gisila.yaml      # ORM schema definition (edit this!)
 │   │   └── models.dart             # Re-exports generated .g.dart
 │   └── utils/
 │       ├── utils.dart              # Barrel export
-│       ├── jwt.dart                # JWTAuth.sign / verify / decodeAndVerify
-│       ├── extensions.dart         # request.contextUser, .isAuthenticated
-│       ├── exceptions.dart         # EndpointException, unauthorizedException
-│       ├── request_handler.dart    # handleRequest() error-handling wrapper
-│       └── forms/
-│           ├── field_exceptions.dart
-│           ├── form_validators.dart  # form(), FieldValidator, common validators
-│           └── parsers/
-│               └── form_data.dart   # multipart + urlencoded parser
+│       └── jwt.dart                # JWTAuth.sign / verify / decodeAndVerify
 ├── database.yaml                   # PostgreSQL connection config
 ├── .env.example                    # Environment variable template
 ├── docker-compose.yaml             # Local Postgres on port 5454
@@ -166,36 +169,90 @@ dart-backend-template/
 
 ## Adding a new endpoint
 
-1. Create `lib/endpoints/posts.dart`:
+The template follows an explicit **MVC layout**:
+
+```
+controller (lib/endpoints/) ─── form (lib/forms/) ─── service (lib/services/)
+                                                                │
+                                                          ctx.db<Database>()
+```
+
+1. **Service** — owns persistence + business logic. Use `ctx.db<Database>()`
+   for query execution and throw framework exceptions for errors:
    ```dart
-   import 'package:gisila_doc/gisila_doc.dart' hide Query;
+   // lib/services/posts_service.dart
+   import 'package:gisila/gisila.dart' hide Query;
    import 'package:gisila_orm/gisila.dart';
-   import 'package:my_app/config.dart';
    import 'package:my_app/models/models.dart';
-   import 'package:my_app/utils/utils.dart';
-   import 'package:shelf/shelf.dart';
-   import 'package:shelf_router/shelf_router.dart';
+
+   class PostsService extends Service {
+     Database get _db => db<Database>();
+
+     Future<List<Post>> list() =>
+         Query<Post>(PostTable.metadata).all(_db.context());
+
+     Future<Post> create({required String title, String? body}) =>
+         Query<Post>(PostTable.metadata).insert({
+           'title': title,
+           'body': body,
+           'createdAt': DateTime.now().toUtc().toIso8601String(),
+         }).one(_db.context());
+   }
+   ```
+2. **Form** — declarative request body schema:
+   ```dart
+   // lib/forms/post_forms.dart
+   import 'package:gisila/gisila.dart';
+
+   class CreatePostForm extends Form {
+     final title = StringField(name: 'title', required: true, maxLength: 200);
+     final body  = StringField(name: 'body');
+
+     @override
+     List<FormField<Object?>> collectFields() => [title, body];
+   }
+   ```
+3. **Controller** — thin orchestrator. Takes `Form` + `Service` params and
+   returns the JSON body directly:
+   ```dart
+   // lib/endpoints/posts.dart
+   import 'package:gisila_doc/gisila_doc.dart';
+   import 'package:my_app/forms/post_forms.dart';
+   import 'package:my_app/services/posts_service.dart';
 
    part 'posts.g.dart';
 
    @Controller('/posts', ['Posts'])
+   @RequireAuth()
    class PostsApi {
      @Get('/', summary: 'List posts')
-     Future<Response> list(Request request) => handleRequest(
-           request,
-           permission: () {},
-           endpoint: () async {
-             final db = request.contextDb ?? await Database.connect(databaseConfig);
-             final posts = await Query<Post>(PostTable.metadata).all(db.context());
-             return jsonResponse(body: {'results': posts.map((p) => p.toJson()).toList()});
-           },
-         );
+     Future<List<Map<String, Object?>>> list(PostsService posts) async {
+       final all = await posts.list();
+       return all.map((p) => p.toJson()).toList();
+     }
+
+     @Post('/', summary: 'Create a post')
+     Future<Map<String, Object?>> create(
+       CreatePostForm form,
+       PostsService posts,
+     ) async {
+       final created = await posts.create(
+         title: form.title.value!,
+         body: form.body.value,
+       );
+       return created.toJson();
+     }
    }
    ```
-2. Run `dart run build_runner build` to generate `posts.g.dart`.
-3. Register in `lib/my_app.dart`:
+4. Run `dart run build_runner build` to generate `posts.g.dart`.
+5. Register the service and controller in `lib/my_app.dart`:
    ```dart
-   PostsApi().attachOpenApi(spec, router);
+   app.registerService<PostsService>(PostsService.new);
+
+   app.registerController(attacher: (app, router, {prefix = ''}) {
+     PostsApi().attachToApp(app, router, spec, prefix: prefix);
+     // ... existing controllers
+   });
    ```
 
 ---

@@ -29,6 +29,8 @@ dependencies:
 dependency_overrides:
   gisila:
     path: ../gisila
+  gisila_doc:
+    path: ../gisila_doc
   gisila_orm:
     path: ../gisila_orm
 

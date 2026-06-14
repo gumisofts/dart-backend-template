@@ -9,11 +9,11 @@ import 'package:shelf/shelf.dart';
 /// The [Database] connection is created on the first request so the studio
 /// shares the same lifecycle as the rest of the application.
 Handler adminHandler() {
-  GisilaStudio? studio;
+  Handler? handler;
 
   return (Request req) async {
-    studio ??= await _buildStudio();
-    return studio!.handler()(req);
+    handler ??= (await _buildStudio()).handler(prefix: '/admin');
+    return handler!(req);
   };
 }
 
