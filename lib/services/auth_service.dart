@@ -4,10 +4,9 @@ import 'package:my_app/models/models.dart';
 import 'package:my_app/utils/jwt.dart';
 
 /// Business logic for the `/auth` endpoints. Controllers stay thin and
-/// forward to this service; persistence and JWT minting live here.
+@Controller('/auth')
 class AuthService extends Service {
   Database get _database => db<Database>();
-
   Future<({User user, String accessToken})> register({
     required String email,
     required String password,
