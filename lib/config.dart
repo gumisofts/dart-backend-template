@@ -33,8 +33,10 @@ Future<void> init() async {
 
 String _loadJwtSecret() {
   final secret = env['JWT_SECRET'] ?? '';
-  final placeholder =
-      secret.toLowerCase().replaceAll(RegExp('[^a-z]'), '').contains('changeme');
+  final placeholder = secret
+      .toLowerCase()
+      .replaceAll(RegExp('[^a-z]'), '')
+      .contains('changeme');
   final problem = secret.isEmpty
       ? 'is not set'
       : secret.length < minJwtSecretLength
