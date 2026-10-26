@@ -12,7 +12,9 @@ Handler adminHandler() {
   Handler? handler;
 
   return (Request req) async {
-    handler ??= (await _buildStudio()).handler(prefix: '/admin');
+    // Must match the mount path in my_app.dart, or links, redirects and the
+    // login cookie point at the wrong place.
+    handler ??= (await _buildStudio()).handler(prefix: '/studio');
     return handler!(req);
   };
 }
@@ -20,11 +22,17 @@ Handler adminHandler() {
 Future<GisilaStudio> _buildStudio() async {
   final db = await Database.connect(databaseConfig);
 
+  // No defaults: without STUDIO_USERNAME / STUDIO_PASSWORD (or with a weak
+  // password) the studio serves a "disabled" page and the API keeps running.
   final studio = GisilaStudio(
     db: db,
     title: 'My App Admin',
-    username: env.getOrElse('STUDIO_USERNAME', () => 'admin'),
-    password: env.getOrElse('STUDIO_PASSWORD', () => 'admin'),
+    username: env['STUDIO_USERNAME'],
+    password: env['STUDIO_PASSWORD'],
+    // Stateless JWTs, so logins work across the server's isolates. The key
+    // differs from JWT_SECRET, so a studio token is never a valid API token
+    // or the other way round.
+    secret: '$jwtSecret:gisila-studio',
   );
 
   studio.register<User>(

@@ -4,10 +4,10 @@ import 'package:my_app/models/models.dart';
 
 /// Stateless JWT helper.
 ///
-/// The secret is read from the `JWT_SECRET` environment variable.
+/// The secret is `JWT_SECRET`, validated by `init()` in `config.dart`.
 /// The token lifetime defaults to `JWT_EXPIRE_DAYS` (default: 30).
 class JWTAuth {
-  static String _secret() => env.getOrElse('JWT_SECRET', () => 'change-me');
+  static String _secret() => jwtSecret;
   static Duration _expiry() => Duration(
         days: int.parse(env.getOrElse('JWT_EXPIRE_DAYS', () => '30')),
       );
