@@ -42,7 +42,8 @@ dart pub get
 
 ```bash
 cp .env.example .env
-# Edit .env: set JWT_SECRET to a random string
+openssl rand -hex 32   # paste into .env as JWT_SECRET (required, 32+ chars)
+# Optional: set STUDIO_PASSWORD (12+ characters) in .env to enable /studio
 ```
 
 ### 3. Start PostgreSQL
@@ -78,7 +79,7 @@ dart run bin/server.dart
 
 Open:
 - API docs → <http://localhost:8000/docs>
-- Admin panel → <http://localhost:8000/studio>  _(default: admin / admin)_
+- Admin panel → <http://localhost:8000/studio>  _(log in with `STUDIO_USERNAME` / `STUDIO_PASSWORD` from `.env`)_
 
 ---
 
@@ -262,10 +263,11 @@ controller (lib/endpoints/) ─── form (lib/forms/) ─── service (lib/s
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `8000` | HTTP listen port |
-| `JWT_SECRET` | `change-me-to-a-random-secret` | HMAC secret for signing JWTs |
+| `JWT_SECRET` | none, **required** | HMAC secret for signing JWTs, at least 32 characters. The server refuses to start without it |
 | `JWT_EXPIRE_DAYS` | `30` | Token lifetime in days |
-| `STUDIO_USERNAME` | `admin` | Admin panel username |
-| `STUDIO_PASSWORD` | `admin` | Admin panel password |
+| `STUDIO_USERNAME` | none | Admin panel username |
+| `STUDIO_PASSWORD` | none | Admin panel password, at least 12 characters. Unset or weak: `/studio` shows a "disabled" page |
+| `GISILA_ALLOW_INSECURE` | unset | `1` lets a weak (but non-empty) `JWT_SECRET` or studio password through with a warning. Never in production |
 
 ---
 
@@ -278,5 +280,5 @@ dart compile exe bin/server.dart -o build/server
 ./build/server
 ```
 
-Set `PORT`, `JWT_SECRET`, and point `database.yaml` at your production Postgres
-instance before running in production.
+Set `PORT`, `JWT_SECRET` and the studio credentials, and point `database.yaml`
+at your production Postgres instance before running in production.
