@@ -26,6 +26,10 @@ doc/api/
 
 # Compiled native executable
 /build/
+bin/*.exe
+
+# Local path overrides for the gisila_* checkouts (see pubspec_overrides.yaml)
+pubspec_overrides.yaml
 
 # Avoid committing generated Javascript files:
 *.dart.js

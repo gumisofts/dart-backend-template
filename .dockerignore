@@ -1,0 +1,6 @@
+.dart_tool/
+build/
+bin/*.exe
+.env
+.env.local
+pubspec_overrides.yaml

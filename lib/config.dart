@@ -28,7 +28,12 @@ const minJwtSecretLength = 32;
 /// never starts with forgeable tokens.
 Future<void> init() async {
   jwtSecret = _loadJwtSecret();
-  databaseConfig = await DatabaseConfig.fromFile('database.yaml');
+  // DATABASE_URL (postgres://user:pass@host:5432/db?sslmode=...) wins, as
+  // on most hosts and in the Dockerfile; database.yaml is for local work.
+  final url = env['DATABASE_URL'] ?? '';
+  databaseConfig = url.isNotEmpty
+      ? DatabaseConfig(connections: [DatabaseConnection.fromUrl('default', url)])
+      : await DatabaseConfig.fromFile('database.yaml');
 }
 
 String _loadJwtSecret() {
